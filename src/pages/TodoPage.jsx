@@ -1,75 +1,89 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Footer, Header, TodoCollection, TodoInput } from 'components';
-
-const dummyTodos = [
-  {
-    title: 'Learn react-router',
-    isDone: true,
-    id: 1,
-  },
-  {
-    title: 'Learn to create custom hooks',
-    isDone: false,
-    id: 2,
-  },
-  {
-    title: 'Learn to use context',
-    isDone: true,
-    id: 3,
-  },
-  {
-    title: 'Learn to implement auth',
-    isDone: false,
-    id: 4,
-  },
-];
-
+import { getTodos, createTodo, patchTodo, deleteTodo } from '../api/todo';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from 'contexts/AuthContext';
 const TodoPage = () => {
   const [inputValue, setInputValue] = useState('');
-  const [todos, setTodos] = useState(dummyTodos);
+  const [todos, setTodos] = useState([]);
+  const navigate = useNavigate();
+  const { isAuthenticated, currentMember } = useAuth();
 
   function handleInputChange(value) {
     setInputValue(value);
   }
 
-  function handleAddTodo() {
+  async function handleAddTodo() {
     if (inputValue.length === 0) return;
-    setTodos([
-      ...todos,
-      {
+    try {
+      const data = await createTodo({
         title: inputValue,
         isDone: false,
-        id: Math.random() * 100,
-      },
-    ]);
-    setInputValue('');
-  }
-
-  function handleKeyPress() {
-    if (inputValue.length === 0) return;
-    setTodos([
-      ...todos,
-      {
-        title: inputValue,
-        isDone: false,
-        id: Math.random() * 100,
-      },
-    ]);
-    setInputValue('');
-  }
-
-  function handleToggleDone(id) {
-    setTodos((prevTodos) => {
-      return prevTodos.map((todo) => {
-        if (todo.id === id) {
-          return {
-            ...todo,
-            isDone: !todo.isDone,
-          };
-        }
-        return todo;
       });
-    });
+      setTodos((prevTodos) => {
+        return [
+          ...prevTodos,
+          {
+            id: data.id,
+            title: data.title,
+            isDone: data.isDone,
+            isEdit: false,
+          },
+        ];
+      });
+
+      setInputValue('');
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function handleKeyPress() {
+    if (inputValue.length === 0) return;
+    try {
+      const data = await createTodo({
+        title: inputValue,
+        isDone: false,
+      });
+      setTodos((prevTodos) => {
+        return [
+          ...prevTodos,
+          {
+            id: data.id,
+            title: data.title,
+            isDone: data.isDone,
+            isEdit: false,
+          },
+        ];
+      });
+
+      setInputValue('');
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function handleToggleDone(id) {
+    const currentTodo = todos.find((todo) => todo.id === id);
+    try {
+      await patchTodo({
+        id,
+        isDone: !currentTodo.isDone,
+      });
+      setTodos((prevTodos) => {
+        return prevTodos.map((todo) => {
+          if (todo.id === id) {
+            return {
+              ...todo,
+              isDone: !todo.isDone,
+            };
+          }
+          return todo;
+        });
+      });
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   function handleChangeMode({ id, isEdit }) {
@@ -89,31 +103,63 @@ const TodoPage = () => {
     });
   }
 
-  function handleSave({ id, title }) {
-    setTodos((prevTodos) => {
-      return prevTodos.map((todo) => {
-        if (todo.id === id) {
-          return {
-            ...todo,
-            title,
-            isEdit: false,
-          };
-        }
-        return todo;
+  async function handleSave({ id, title }) {
+    try {
+      await patchTodo({
+        id,
+        title,
       });
-    });
+
+      setTodos((prevTodos) => {
+        return prevTodos.map((todo) => {
+          if (todo.id === id) {
+            return {
+              ...todo,
+              title,
+              isEdit: false,
+            };
+          }
+          return todo;
+        });
+      });
+    } catch (error) {
+      console.error(error);
+    }
   }
 
-  function handleDelete(id) {
-    setTodos((prevTodos) => {
-      return prevTodos.filter((todo) => todo.id !== id);
-    });
+  async function handleDelete(id) {
+    try {
+      await deleteTodo(id);
+      setTodos((prevTodos) => {
+        return prevTodos.filter((todo) => todo.id !== id);
+      });
+    } catch (error) {
+      console.error(error);
+    }
   }
+
+  useEffect(() => {
+    async function getTodosAsync() {
+      try {
+        const todos = await getTodos();
+        setTodos(todos.map((todo) => ({ ...todo, isEdit: false })));
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    getTodosAsync();
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [navigate, isAuthenticated]);
 
   return (
     <div>
       TodoPage
-      <Header />
+      <Header username={currentMember && currentMember.name} />
       <TodoInput
         inputValue={inputValue}
         onChange={handleInputChange}

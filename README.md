@@ -20,4 +20,10 @@ npm i
 npm run start
 ```
 
-4. 打開 http://localhost:3000/todo
+4. 新開一個 cmd 視窗執行 npm run dev-server 啟動模擬的 todos 資料伺服器
+
+```bash
+npm run dev-server
+```
+
+5. 打開 http://localhost:3000/ 登入帳號、密碼
